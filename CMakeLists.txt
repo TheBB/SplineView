@@ -89,9 +89,8 @@ find_package(Qt5Widgets REQUIRED)
 
 # Configure files
 
-configure_file(
-  "${CMAKE_CURRENT_LIST_DIR}/src/main.h.in"
-  "${PROJECT_BINARY_DIR}/main.h")
+configure_file("${CMAKE_CURRENT_LIST_DIR}/src/main.h.in" "${PROJECT_BINARY_DIR}/main.h")
+configure_file("${CMAKE_CURRENT_LIST_DIR}/ogre/plugins.cfg.in" "${PROJECT_BINARY_DIR}/ogre/plugins.cfg")
 
 
 # Includes

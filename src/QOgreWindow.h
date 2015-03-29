@@ -58,9 +58,48 @@ public:
     QOgreWindow(QWindow *parent = NULL);
     ~QOgreWindow();
 
+    virtual void render(QPainter *painter);
+    virtual void render();
+    virtual void initialize();
+    virtual void createScene();
+#if OGRE_VERSION >= ((2 << 16) | (0 << 8) | 0)
+    virtual void createCompositor();
+#endif
+
+    void setAnimating(bool animating);
+
+public slots:
+    virtual void renderLater();
+    virtual void renderNow();
+
+    virtual bool eventFilter(QObject *target, QEvent *event);
+
+signals:
+    void entitySelected(Ogre::Entity *entity);
+
 protected:
     Ogre::Root *mOgreRoot;
+    Ogre::RenderWindow *mOgreWindow;
+    Ogre::SceneManager *mOgreSceneMgr;
+    Ogre::Camera *mOgreCamera;
+    Ogre::ColourValue mOgreBackground;
     OgreQtBites::SdkQtCameraMan *mCameraMan;
+
+    bool mUpdatePending, mAnimating;
+
+    virtual void keyPressEvent(QKeyEvent *evt);
+    virtual void keyReleaseEvent(QKeyEvent *evt);
+    virtual void mouseMoveEvent(QMouseEvent *evt);
+    virtual void wheelEvent(QWheelEvent *evt);
+    virtual void mousePressEvent(QMouseEvent *evt);
+    virtual void mouseReleaseEvent(QMouseEvent *evt);
+    virtual void exposeEvent(QExposeEvent *evt);
+    virtual bool event(QEvent *evt);
+
+    virtual bool frameRenderingQueued(const Ogre::FrameEvent &evt);
+
+    void log(Ogre::String msg);
+    void log(QString msg);
 };
 
 #endif /* QOGREWINDOW_H */
