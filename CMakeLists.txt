@@ -106,7 +106,8 @@ add_executable(SplineView
   src/main.cpp
   src/MainWindow.cpp
   src/QOgreWindow.cpp
-  src/SdkQtCameraMan.h
+  src/CameraMan.cpp
+  # src/SdkQtCameraMan.h
   )
 
 qt5_use_modules(SplineView Core Widgets)

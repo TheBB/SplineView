@@ -56,7 +56,7 @@ QOgreWindow::QOgreWindow(QWindow *parent)
 {
     setAnimating(true);
     installEventFilter(this);
-    mOgreBackground = Ogre::ColourValue(0.0f, 0.5f, 1.0f);
+    mOgreBackground = Ogre::ColourValue(1.0f, 1.0f, 1.0f);
 }
 
 
@@ -85,8 +85,6 @@ void QOgreWindow::initialize()
     Ogre::ConfigFile ogreConfig;
 
     const Ogre::RenderSystemList &rsList = mOgreRoot->getAvailableRenderers();
-    for (auto rs : rsList)
-        std::cout << "---rs: " << rs->getName() << std::endl;
     Ogre::RenderSystem *rs = NULL;
 
     Ogre::StringVector renderOrder;
@@ -94,8 +92,8 @@ void QOgreWindow::initialize()
     renderOrder.push_back("Direct3D9");
     renderOrder.push_back("Direct3D11");
 #endif
-    renderOrder.push_back("OpenGL");
     renderOrder.push_back("OpenGL 3+");
+    renderOrder.push_back("OpenGL");
 
     for (auto s : renderOrder)
     {
@@ -114,8 +112,6 @@ void QOgreWindow::initialize()
                     "Abort render system configuration",
                     "QOgreWindow::initialize");
 
-    std::cout << "---found renderer" << std::endl;
-    std::cout << rs << std::endl;
     QString dimensions = QString("%1 x %2").arg(this->width()).arg(this->height());
     rs->setConfigOption("Video Mode", dimensions.toStdString());
     rs->setConfigOption("Full Screen", "No");
@@ -181,29 +177,36 @@ void QOgreWindow::initialize()
 }
 
 
+void addCube(Ogre::String name, Ogre::SceneManager *sceneMgr,
+             Ogre::Vector3 position, float red, float green, float blue)
+{
+    Ogre::Entity *cube = sceneMgr->createEntity(name, Ogre::SceneManager::PT_CUBE);
+    Ogre::SceneNode *node = sceneMgr->getRootSceneNode()->createChildSceneNode();
+    node->attachObject(cube);
+    node->setPosition(position);
+    node->setScale(0.01f, 0.01f, 0.01f);
+
+    Ogre::MaterialPtr material = Ogre::MaterialManager::getSingleton().create(
+        name + "Material", Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, true);
+    material->getTechnique(0)->getPass(0)->setAmbient(red, green, blue);
+    material->getTechnique(0)->getPass(0)->setDiffuse(0.3 * red, 0.3 * green, 0.3 * blue, 1.0f);
+    material->getTechnique(0)->getPass(0)->setSpecular(std::max<float>(2 * red, 1.0f),
+                                                       std::max<float>(2 * green, 1.0f),
+                                                       std::max<float>(2 * blue, 1.0f),
+                                                       1.0f);
+
+    cube->setMaterialName(name + "Material");
+}
+
+
 void QOgreWindow::createScene()
 {
     mOgreSceneMgr->setAmbientLight(Ogre::ColourValue(0.5f, 0.5f, 0.5f));
 
-#if OGRE_VERSION >= ((2 << 16) | (0 << 8) | 0)
-    Ogre::Entity *sphereMesh = mOgreSceneMgr->createEntity(Ogre::SceneManager::PT_SPHERE);
-#else
-    Ogre::Entity *sphereMesh = mOgreSceneMgr->createEntity("Sphere", Ogre::SceneManager::PT_SPHERE);
-#endif
-
-    Ogre::SceneNode *childSceneNode = mOgreSceneMgr->getRootSceneNode()->createChildSceneNode();
-    childSceneNode->attachObject(sphereMesh);
-
-    Ogre::MaterialPtr sphereMaterial = Ogre::MaterialManager::getSingleton().create(
-        "SphereMaterial", Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, true);
-
-    sphereMaterial->getTechnique(0)->getPass(0)->setAmbient(0.1f, 0.1f, 0.1f);
-    sphereMaterial->getTechnique(0)->getPass(0)->setDiffuse(0.2f, 0.2f, 0.2f, 1.0f);
-    sphereMaterial->getTechnique(0)->getPass(0)->setSpecular(0.9f, 0.9f, 0.9f, 1.0f);
-
-    sphereMesh->setMaterialName("SphereMaterial");
-    childSceneNode->setPosition(Ogre::Vector3(0.0f, 0.0f, 0.0f));
-    childSceneNode->setScale(Ogre::Vector3(0.01f, 0.01f, 0.01f));
+    addCube("Center", mOgreSceneMgr, Ogre::Vector3(0.0f, 0.0f, 0.0f), 0.7f, 0.7f, 0.7f);
+    addCube("X", mOgreSceneMgr, Ogre::Vector3(2.0f, 0.0f, 0.0f), 0.7f, 0.0f, 0.0f);
+    addCube("Y", mOgreSceneMgr, Ogre::Vector3(0.0f, 2.0f, 0.0f), 0.0f, 0.7f, 0.0f);
+    addCube("Z", mOgreSceneMgr, Ogre::Vector3(0.0f, 0.0f, 2.0f), 0.0f, 0.0f, 0.7f);
 
 #if OGRE_VERSION >= ((2 << 16) | (0 << 8) | 0)
     Ogre::SceneNode *lightNode = mOgreSceneMgr->getRootSceneNode()->createChildSceneNode();
@@ -312,12 +315,12 @@ void QOgreWindow::mouseMoveEvent(QMouseEvent *evt)
 {
     static int lastX = evt->x();
     static int lastY = evt->y();
-    int relX = evt->x() - lastX;
-    int relY = evt->y() - lastY;
+    float relX = (float)(evt->x() - lastX) / this->width();
+    float relY = (float)(evt->y() - lastY) / this->height();
     lastX = evt->x();
     lastY = evt->y();
 
-    if (mCameraMan && (evt->buttons() & Qt::LeftButton))
+    if (mCameraMan)
         mCameraMan->injectMouseMove(relX, relY);
 }
 
@@ -341,17 +344,20 @@ void QOgreWindow::mouseReleaseEvent(QMouseEvent *evt)
     if (mCameraMan)
         mCameraMan->injectMouseUp(*evt);
 
-    QPoint pos = evt->pos();
-    Ogre::Ray mouseRay = mOgreCamera->getCameraToViewportRay(
-        (Ogre::Real)pos.x() / mOgreWindow->getWidth(),
-        (Ogre::Real)pos.y() / mOgreWindow->getHeight());
-    Ogre::RaySceneQuery *query = mOgreSceneMgr->createRayQuery(mouseRay);
-    query->setSortByDistance(true);
-    Ogre::RaySceneQueryResult result = query->execute();
-    for (size_t i = 0; i < result.size(); i++)
-        if (result[i].movable && result[i].movable->getMovableType().compare("Entity") == 0)
-            emit entitySelected((Ogre::Entity*)result[i].movable);
-    mOgreSceneMgr->destroyQuery(query);
+    if (evt->button() == Qt::LeftButton)
+    {
+        QPoint pos = evt->pos();
+        Ogre::Ray mouseRay = mOgreCamera->getCameraToViewportRay(
+            (Ogre::Real)pos.x() / mOgreWindow->getWidth(),
+            (Ogre::Real)pos.y() / mOgreWindow->getHeight());
+        Ogre::RaySceneQuery *query = mOgreSceneMgr->createRayQuery(mouseRay);
+        query->setSortByDistance(true);
+        Ogre::RaySceneQueryResult result = query->execute();
+        for (size_t i = 0; i < result.size(); i++)
+            if (result[i].movable && result[i].movable->getMovableType().compare("Entity") == 0)
+                emit entitySelected((Ogre::Entity*)result[i].movable);
+        mOgreSceneMgr->destroyQuery(query);
+    }
 }
 
 
